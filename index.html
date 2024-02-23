@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>20以内退位减法练习</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .number, .subtrahend {
+            cursor: pointer;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #007bff;
+            display: inline-block;
+width: 38px;
+        
+        margin: 10px;
+            font-size: 30px;
+            background-color: #fff;
+        }
+        .selected {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .equation {
+            font-size: 40px;
+            text-align: center;
+            margin: 40px 0;
+        }
+        .correct {
+            color: green;
+            font-size: 24px;
+        }
+        .wrong {
+            color: red;
+            font-size: 24px;
+        }
+        #subtrahendSelection, #answerSelection {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .info {
+            font-size: 20px;
+            text-align: center;
+            margin: 10px;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="info" id="totalQuestions">总题数: 0</div>
+    <div class="info" id="remainingQuestions">剩余题数: 0</div>
+    <div class="info" id="correctCount">做对题数: 0</div>
+    <div class="info" id="timer">时间：00:00</div>
+    <h2>选择减数 (9-2):</h2>
+    <div id="subtrahendSelection" class="subtrahendSelection"></div>
+    <div class="equation" id="equation">请选择减数开始练习</div>
+    <div id="answerSelection"></div>
+    <div class="info" id="restartSection" style="display: none;">
+        <button id="restartButton" class="button">重做错题</button>
+    </div>
+    <script>
+        let startTime, timerInterval, firstClick = true;
+        let correctCount = 0, wrongQuestions = [];
+        let questions = [], currentQuestionIndex = -1;
+        let selectedSubtrahends = [], allQuestions = [];
+        let timerStarted = false; // 新增变量以控制计时器启动
+
+        function init() {
+            initSubtrahendSelection();
+            document.getElementById('restartButton').addEventListener('click', restartWithWrongQuestions);
+        }
+
+        function initSubtrahendSelection() {
+            const subtrahendSelection = document.getElementById('subtrahendSelection');
+            for (let i = 9; i >= 2; i--) {
+                const subtrahendEl = document.createElement('div');
+                subtrahendEl.textContent = i;
+                subtrahendEl.classList.add('subtrahend');
+                subtrahendEl.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                    toggleSubtrahend(i);
+                });
+                subtrahendSelection.appendChild(subtrahendEl);
+            }
+        }
+
+        function toggleSubtrahend(i) {
+            const index = selectedSubtrahends.indexOf(i);
+            if (index > -1) {
+                selectedSubtrahends.splice(index, 1);
+            } else {
+                selectedSubtrahends.push(i);
+            }
+            resetTimer(); // 仅重置计时器
+            generateAllQuestions();
+            document.getElementById('restartSection').style.display = 'none';
+        }
+
+        function generateAllQuestions() {
+            allQuestions = [];
+            wrongQuestions = [];
+            correctCount = 0;
+            for (let minuend = 11; minuend <= 19; minuend++) {
+                for (const subtrahend of selectedSubtrahends) {
+                    if (minuend % 10 < subtrahend) {
+                        allQuestions.push({ minuend, subtrahend, answered: false });
+                    }
+                }
+            }
+            document.getElementById('totalQuestions').textContent = `总题数: ${allQuestions.length}`;
+            document.getElementById('correctCount').textContent = `做对题数: 0`;
+            startNewRound();
+        }
+
+        function startNewRound() {
+            shuffleArray(allQuestions);
+            currentQuestionIndex = -1;
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            if (currentQuestionIndex + 1 < allQuestions.length) {
+                currentQuestionIndex++;
+                const { minuend, subtrahend } = allQuestions[currentQuestionIndex];
+                document.getElementById('equation').textContent = `${minuend} - ${subtrahend} = `;
+                initAnswerSelection();
+            } else {
+                clearInterval(timerInterval);
+                showCompletionMessage();
+            }
+        }
+
+        function initAnswerSelection() {
+            const answerSelection = document.getElementById('answerSelection');
+            answerSelection.innerHTML = '';
+            for (let answer = 2; answer <= 9; answer++) {
+                const numberEl = document.createElement('div');
+                numberEl.textContent = answer;
+                numberEl.classList.add('number');
+                numberEl.addEventListener('click', () => {
+                    if (!timerStarted) { // 如果计时器未启动，则启动计时器
+                        startTimer();
+                        timerStarted = true;
+                    }
+                    checkAnswer(answer, allQuestions[currentQuestionIndex].minuend, allQuestions[currentQuestionIndex].subtrahend);
+                });
+                answerSelection.appendChild(numberEl);
+            }
+        }
+
+        function checkAnswer(answer, minuend, subtrahend) {
+            const correctAnswer = minuend - subtrahend;
+            const equationElement = document.getElementById('equation');
+            equationElement.textContent += answer;
+            if (answer === correctAnswer) {
+                correctCount++;
+                equationElement.innerHTML += ' <span class="correct">&#10004;</span>';
+            } else {
+                wrongQuestions.push(allQuestions[currentQuestionIndex]);
+                equationElement.innerHTML += ' <span class="wrong">&#10008;</span>';
+            }
+            document.getElementById('correctCount').textContent = `做对题数: ${correctCount}`;
+            setTimeout(nextQuestion, 2000);
+        }
+
+        function showCompletionMessage() {
+            const timeSpent = document.getElementById('timer').textContent.slice(3);
+            document.getElementById('equation').innerHTML = `用时:${timeSpent}<br>做对:${correctCount}题`;
+            document.getElementById('restartSection').style.display = wrongQuestions.length > 0 ? 'block' : 'none';
+        }
+
+        function restartWithWrongQuestions() {
+            allQuestions = wrongQuestions.slice();
+            wrongQuestions = [];
+            correctCount = 0;
+            timerStarted = false; // 重置计时器启动状态
+            resetTimer();
+            document.getElementById('restartSection').style.display = 'none';
+            startNewRound();
+        }
+
+        function resetTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            timerStarted = false; // 重置计时器启动标志
+            document.getElementById('timer').textContent = '时间：00:00';
+        }
+
+        function startTimer() {
+            startTime = new Date();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const now = new Date();
+            const elapsed = now - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = ((elapsed % 60000) / 1000).toFixed(0);
+            document.getElementById('timer').textContent = `时间：${minutes}:${(seconds < 10 ? '0' : '')}${seconds}`;
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
