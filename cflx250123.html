@@ -1,0 +1,408 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>口算练习</title>
+<style>
+:root {
+--primary-color: #3498db;
+--success-color: #2ecc71;
+--danger-color: #e74c3c;
+--bg-color: #f5f6fa;
+}
+
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+max-width: 600px;
+margin: 0 auto;
+padding: 20px;
+background-color: var(--bg-color);
+}
+
+.container {
+background-color: white;
+padding: 30px;
+border-radius: 15px;
+box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+position: relative;
+}
+
+#question {
+font-size: 52px;
+text-align: center;
+margin: 25px 0;
+color: #2c3e50;
+letter-spacing: 2px;
+}
+
+#input-container {
+text-align: center;
+margin: 25px 0;
+}
+
+#answer {
+font-size: 36px;
+width: 220px;
+text-align: center;
+margin-bottom: 20px;
+border: 3px solid var(--primary-color);
+border-radius: 8px;
+padding: 8px;
+transition: all 0.3s;
+}
+
+.keypad {
+display: grid;
+grid-template-columns: repeat(3, 1fr) 3fr;
+gap: 12px;
+max-width: 400px;
+margin: 0 auto;
+}
+
+.num-btn {
+background: linear-gradient(145deg, #ffffff, #f0f0f0);
+border: 2px solid #ddd;
+color: #333;
+font-weight: bold;
+box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+aspect-ratio: 1;
+height: 60px;
+padding: 0;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.num-btn.zero {
+grid-column: span 3;
+aspect-ratio: unset;
+height: 60px;
+}
+
+.control-btn {
+background: linear-gradient(145deg, var(--primary-color), #2980b9);
+font-weight: bold;
+height: 60px;
+}
+
+#confirm-btn {
+grid-column: 4;
+grid-row: 4;
+background: linear-gradient(145deg, var(--success-color), #27ae60);
+}
+
+#end-btn {
+background: linear-gradient(145deg, var(--danger-color), #c0392b);
+}
+
+button {
+font-size: 24px;
+border: none;
+border-radius: 10px;
+color: white;
+cursor: pointer;
+transition: all 0.15s;
+}
+
+#stats {
+display: flex;
+justify-content: space-around;
+margin: 20px 0;
+font-size: 18px;
+color: #666;
+}
+
+.stats-item {
+display: flex;
+flex-direction: column;
+align-items: center;
+background: rgba(255,255,255,0.9);
+padding: 12px 20px;
+border-radius: 8px;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#timer {
+font-weight: bold;
+color: var(--primary-color);
+}
+
+#result {
+text-align: center;
+margin-top: 20px;
+font-size: 20px;
+min-height: 28px;
+}
+
+.report-modal {
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+background: white;
+padding: 30px;
+border-radius: 15px;
+box-shadow: 0 0 20px rgba(0,0,0,0.2);
+z-index: 1000;
+max-width: 500px;
+width: 90%;
+}
+
+.report-table {
+width: 100%;
+margin: 15px 0;
+border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+padding: 10px;
+text-align: left;
+border-bottom: 1px solid #ddd;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div id="stats">
+<div class="stats-item">
+<div>正确</div>
+<div id="correct-count">0</div>
+</div>
+<div class="stats-item">
+<div>用时</div>
+<div id="timer">00:00</div>
+</div>
+<div class="stats-item">
+<div>错误</div>
+<div id="wrong-count">0</div>
+</div>
+</div>
+
+<div id="question"></div>
+<div id="input-container">
+<input type="text" id="answer" readonly>
+<div class="keypad">
+<button class="num-btn" onclick="addNumber('7')">7</button>
+<button class="num-btn" onclick="addNumber('8')">8</button>
+<button class="num-btn" onclick="addNumber('9')">9</button>
+<button id="end-btn" class="control-btn" onclick="endPractice()">结束</button>
+
+<button class="num-btn" onclick="addNumber('4')">4</button>
+<button class="num-btn" onclick="addNumber('5')">5</button>
+<button class="num-btn" onclick="addNumber('6')">6</button>
+<button class="control-btn" onclick="clearInput()">清除</button>
+
+<button class="num-btn" onclick="addNumber('1')">1</button>
+<button class="num-btn" onclick="addNumber('2')">2</button>
+<button class="num-btn" onclick="addNumber('3')">3</button>
+
+<button class="num-btn zero" onclick="addNumber('0')">0</button>
+<button id="confirm-btn" class="control-btn" onclick="submitAnswer()">确定</button>
+</div>
+</div>
+<div id="result"></div>
+</div>
+
+<script>
+let currentQuestion = null;
+let correctCount = 0;
+let wrongCount = 0;
+let startTime = null;
+let timerInterval = null;
+let isFirstAnswer = true;
+let studentName = localStorage.getItem('studentName') || '';
+let lastQuestionAnswered = true; // 标记最后一题是否已提交
+
+const stats = {
+'tens': { total: 0, correct: 0 },
+'hundreds': { total: 0, correct: 0 },
+'thousands': { total: 0, correct: 0 },
+'twoDigits': { total: 0, correct: 0 }
+};
+
+if (!studentName) {
+studentName = prompt('请输入你的姓名：');
+if (studentName) {
+localStorage.setItem('studentName', studentName);
+} else {
+studentName = '同学';
+}
+}
+
+function initPractice() {
+correctCount = 0;
+wrongCount = 0;
+isFirstAnswer = true;
+lastQuestionAnswered = true;
+Object.keys(stats).forEach(k => {
+stats[k].total = 0;
+stats[k].correct = 0;
+});
+document.getElementById('correct-count').textContent = '0';
+document.getElementById('wrong-count').textContent = '0';
+document.getElementById('timer').textContent = '00:00';
+if(timerInterval) clearInterval(timerInterval);
+startTime = null;
+generateQuestion();
+}
+
+function updateTimer() {
+const now = new Date();
+const elapsed = Math.floor((now - startTime) / 1000);
+const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
+const seconds = String(elapsed % 60).padStart(2, '0');
+document.getElementById('timer').textContent = `${minutes}:${seconds}`;
+}
+
+function generateQuestion() {
+const type = Math.random() < 0.5 ? 'special' : 'twoDigits';
+let questionType = '';
+
+if(type === 'special') {
+const zeros = Math.pow(10, Math.floor(Math.random() * 3 + 1));
+const num1 = Math.floor(Math.random() * 9 + 1) * zeros;
+const num2 = Math.floor(Math.random() * 9 + 1) + 1; // 确保num2不为1
+
+if(zeros === 10) questionType = 'tens';
+else if(zeros === 100) questionType = 'hundreds';
+else questionType = 'thousands';
+
+currentQuestion = { num1, num2, type: questionType };
+} else {
+const num1 = Math.floor(Math.random() * 90 + 10);
+const num2 = Math.floor(Math.random() * 9 + 1) + 1; // 确保num2不为1
+currentQuestion = { num1, num2, type: 'twoDigits' };
+}
+
+stats[currentQuestion.type].total++;
+lastQuestionAnswered = false; // 新题目生成，标记为未提交
+document.getElementById('question').textContent =
+`${currentQuestion.num1} × ${currentQuestion.num2}`;
+document.getElementById('answer').value = '';
+document.getElementById('result').textContent = '';
+}
+
+function showReport() {
+// 如果最后一题未提交，则从统计中移除
+if (!lastQuestionAnswered) {
+stats[currentQuestion.type].total--;
+}
+
+const totalTime = document.getElementById('timer').textContent;
+const modal = document.createElement('div');
+modal.className = 'report-modal';
+modal.innerHTML = `
+<h2>${studentName}的练习报告</h2>
+<p>练习时间: ${totalTime}</p>
+<table class="report-table">
+<tr>
+<th>题型</th>
+<th>练习数量</th>
+<th>正确数量</th>
+<th>准确率</th>
+</tr>
+${Object.entries(stats).map(([type, data]) => `
+<tr>
+<td>${getTypeName(type)}</td>
+<td>${data.total}</td>
+<td>${data.correct}</td>
+<td>${data.total ? ((data.correct/data.total*100).toFixed(1)+'%') : '0%'}</td>
+</tr>`).join('')}
+</table>
+<button onclick="this.parentElement.remove()" style="
+background: var(--primary-color);
+color: white;
+padding: 10px 20px;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+margin-top: 15px;
+">关闭</button>
+`;
+document.body.appendChild(modal);
+}
+
+function getTypeName(type) {
+return {
+'tens': '整十数×个位',
+'hundreds': '整百数×个位',
+'thousands': '整千数×个位',
+'twoDigits': '两位数×个位'
+}[type];
+}
+
+function checkAutoSubmit() {
+const userAnswer = document.getElementById('answer').value;
+if (userAnswer === String(currentQuestion.num1 * currentQuestion.num2)) {
+submitAnswer();
+}
+}
+
+function submitAnswer() {
+if(isFirstAnswer) {
+startTime = new Date();
+timerInterval = setInterval(updateTimer, 1000);
+isFirstAnswer = false;
+}
+
+const userAnswer = parseInt(document.getElementById('answer').value);
+const correctAnswer = currentQuestion.num1 * currentQuestion.num2;
+const resultDiv = document.getElementById('result');
+
+if (userAnswer === correctAnswer) {
+resultDiv.textContent = '🎉 正确！';
+resultDiv.style.color = 'var(--success-color)';
+correctCount++;
+stats[currentQuestion.type].correct++;
+} else {
+resultDiv.textContent = `❌ 错误！正确答案：${correctAnswer}`;
+resultDiv.style.color = 'var(--danger-color)';
+wrongCount++;
+}
+
+lastQuestionAnswered = true; // 标记当前题目已提交
+document.getElementById('correct-count').textContent = correctCount;
+document.getElementById('wrong-count').textContent = wrongCount;
+
+setTimeout(() => {
+document.getElementById('answer').value = '';
+resultDiv.textContent = '';
+generateQuestion();
+}, userAnswer === correctAnswer ? 500 : 1500);
+}
+
+function endPractice() {
+if(confirm('确定要结束本次练习吗？')) {
+showReport();
+initPractice();
+}
+}
+
+document.getElementById('answer').addEventListener('input', function() {
+checkAutoSubmit();
+});
+
+function addNumber(num) {
+const answer = document.getElementById('answer');
+if (answer.value.length < 6) {
+answer.value += num;
+checkAutoSubmit();
+}
+}
+
+function clearInput() {
+document.getElementById('answer').value = '';
+}
+
+initPractice();
+
+document.addEventListener('keydown', (e) => {
+if (e.key >= '0' && e.key <= '9') addNumber(e.key);
+if (e.key === 'Enter') submitAnswer();
+if (e.key === 'Escape') clearInput();
+});
+</script>
+</body>
+</html>
